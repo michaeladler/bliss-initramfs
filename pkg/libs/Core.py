@@ -526,16 +526,18 @@ class Core:
         # Checks to see if all the modules in the list exist (if any)
         for file in Modules.GetFiles():
             try:
-                cmd = (
-                    "find "
-                    + var.modules
-                    + ' -iname "'
-                    + file
-                    + '.ko" | grep '
-                    + file
-                    + ".ko"
-                )
-                result = check_output(cmd, universal_newlines=True, shell=True).strip()
+                cmd = [
+                    "find",
+                    var.modules,
+                    "-name",
+                    "{}.ko".format(file),
+                    "-o",
+                    "-name",
+                    "{}.ko.gz".format(file),
+                ]
+                result = check_output(cmd, universal_newlines=True).strip()
+                if not result:
+                    raise Tools.ModuleDoesntExist(file)
                 cls._modset.add(result)
             except CalledProcessError:
                 Tools.ModuleDoesntExist(file)
@@ -558,7 +560,7 @@ class Core:
         # Get the dependencies for all the modules in our set
         for file in cls._modset:
             # Get only the name of the module
-            match = re.search("(?<=/)[a-zA-Z0-9_-]+.ko", file)
+            match = re.search("(?<=/)[a-zA-Z0-9_-]+.ko(\.gz)?", file)
 
             if match:
                 sFile = match.group().split(".")[0]
