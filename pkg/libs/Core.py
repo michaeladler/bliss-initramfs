@@ -232,7 +232,10 @@ class Core:
 
         for link in Base.GetKmodLinks():
             os.remove(var.temp + "/bin/" + link)
-            os.symlink("kmod", link)
+            kmod = os.path.realpath(
+                check_output("which kmod", shell=True, universal_newlines=True,).strip()
+            )
+            os.symlink(kmod, link)
 
     # Creates symlinks from library files found in each /usr/lib## dir to the /lib[32/64] directories
     @classmethod
@@ -337,6 +340,14 @@ class Core:
             Tools.Fail("Error creating the mtab file. Exiting.")
 
         cls.CreateLibraryLinks()
+        call(
+            [
+                "ln",
+                "-sf",
+                "/lib64/ld-linux-x86-64.so.2",
+                var.llib + "/ld-linux-x86-64.so.2",
+            ]
+        )
 
         # Copy the init script
         Tools.SafeCopy(var.files_dir + "/init", var.temp)
@@ -388,33 +399,10 @@ class Core:
         libgcc_filename = "libgcc_s.so"
         libgcc_filename_main = libgcc_filename + ".1"
 
-        # check for gcc-config
-        cmd = 'whereis gcc-config | cut -d " " -f 2'
-        res = Tools.Run(cmd)
-
-        if res:
-            # Try gcc-config
-            cmd = "gcc-config -L | cut -d ':' -f 1"
-            res = Tools.Run(cmd)
-
-            if res:
-                # Use path from gcc-config
-                libgcc_path = res[0] + "/" + libgcc_filename_main
-                Tools.SafeCopy(libgcc_path, var.llib64)
-                os.chdir(var.llib64)
-                os.symlink(libgcc_filename_main, libgcc_filename)
-                return
-
-        # Doing a 'whereis <name of libgcc library>' will not work because it seems
-        # that it finds libraries in /lib, /lib64, /usr/lib, /usr/lib64, but not in
-        # /usr/lib/gcc/ (x86_64-pc-linux-gnu/5.4.0, etc)
-
-        # When a better approach is found, we can plug it in here directly and return
-        # in the event that it succeeds. If it fails, we just continue execution
-        # until the end of the function.
-
-        # If we've reached this point, we have failed to copy the gcc library.
-        Tools.Fail("Unable to retrieve the gcc library path!")
+        libgcc_path = "/usr/lib/" + libgcc_filename_main
+        Tools.SafeCopy(libgcc_path, var.llib64)
+        os.chdir(var.llib64)
+        os.symlink(libgcc_filename_main, libgcc_filename)
 
     # Create the initramfs
     @classmethod
